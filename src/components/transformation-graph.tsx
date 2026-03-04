@@ -14,9 +14,10 @@ import {
 interface GraphProps {
   id: string
   gamma?: number
+  threshold?: number
 }
 
-export function TransformationGraph({ id, gamma = 1.0 }: GraphProps) {
+export function TransformationGraph({ id, gamma = 1.0, threshold = 127 }: GraphProps) {
   const data = Array.from({ length: 26 }, (_, i) => {
     const r = (i * 10) / 255
     let s = 0
@@ -24,10 +25,24 @@ export function TransformationGraph({ id, gamma = 1.0 }: GraphProps) {
     if (id === 'negative') {
       s = 1 - r
     } else if (id === 'log') {
-      // s = log(1+r) / log(2) normalized
       s = Math.log(1 + r) / Math.log(2)
     } else if (id === 'power') {
       s = Math.pow(r, gamma)
+    } else if (id === 'threshold') {
+      s = (r * 255) > threshold ? 1 : 0
+    } else if (id === 'contrast') {
+      // Linear stretch demo: map [0.2, 0.8] to [0, 1]
+      s = (r - 0.2) / 0.6
+      s = Math.max(0, Math.min(1, s))
+    } else if (id === 'piecewise') {
+      // Match the processing logic: (70, 20) to (180, 230)
+      const rv = r * 255
+      const r1 = 70, s1 = 20, r2 = 180, s2 = 230
+      let sv = 0
+      if (rv <= r1) sv = (s1/r1) * rv
+      else if (rv <= r2) sv = ((s2-s1)/(r2-r1)) * (rv-r1) + s1
+      else sv = ((255-s2)/(255-r2)) * (rv-r2) + s2
+      s = sv / 255
     }
     
     return {

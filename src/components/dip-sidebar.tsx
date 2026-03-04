@@ -5,10 +5,10 @@ import {
   MinusCircle, 
   Settings2, 
   Zap, 
-  Image as ImageIcon,
   ChevronRight,
-  Code2,
-  Binary
+  Binary,
+  Command,
+  Search
 } from "lucide-react"
 
 import {
@@ -29,16 +29,37 @@ const transformations = [
     title: "Negative",
     id: "negative",
     icon: MinusCircle,
+    shortcut: "N",
   },
   {
-    title: "Log Transformation",
+    title: "Log Transform",
     id: "log",
     icon: Settings2,
+    shortcut: "L",
   },
   {
-    title: "Power Law (Gamma)",
+    title: "Power Law",
     id: "power",
     icon: Zap,
+    shortcut: "P",
+  },
+  {
+    title: "Contrast Stretch",
+    id: "contrast",
+    icon: Settings2,
+    shortcut: "C",
+  },
+  {
+    title: "Thresholding",
+    id: "threshold",
+    icon: MinusCircle,
+    shortcut: "T",
+  },
+  {
+    title: "Piecewise Linear",
+    id: "piecewise",
+    icon: Zap,
+    shortcut: "W",
   },
 ]
 
@@ -49,34 +70,52 @@ interface DIPSidebarProps {
 
 export function DIPSidebar({ activeModule, setActiveModule }: DIPSidebarProps) {
   return (
-    <Sidebar variant="inset" className="border-r border-border/50">
-      <SidebarHeader className="flex flex-row items-center gap-2 px-4 py-6">
-        <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Binary className="size-5" />
+    <Sidebar variant="inset" className="border-r border-white/[0.05] bg-[#08090a]">
+      <SidebarHeader className="h-16 flex flex-row items-center gap-3 px-6">
+        <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_15px_-5px_rgba(16,185,129,0.4)]">
+          <Binary className="size-4" />
         </div>
-        <div className="flex flex-col gap-0.5 leading-none">
-          <span className="font-semibold tracking-tight text-lg">AetherDIP</span>
-          <span className="text-xs text-muted-foreground">Syllabus Companion</span>
+        <div className="flex flex-col">
+          <span className="font-bold tracking-tight text-sm text-white">AetherDIP</span>
+          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">Workspace</span>
         </div>
       </SidebarHeader>
-      <SidebarContent>
+      
+      <SidebarContent className="px-2">
+        <div className="px-4 py-4">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground/50" />
+            <div className="h-9 w-full rounded-md border border-white/[0.05] bg-white/[0.02] pl-8 flex items-center text-xs text-muted-foreground/50 select-none cursor-default">
+              Search modules...
+              <div className="ml-auto mr-1 flex items-center gap-0.5 rounded border border-white/[0.1] bg-white/[0.05] px-1.5 font-mono text-[10px]">
+                <Command className="size-2" />K
+              </div>
+            </div>
+          </div>
+        </div>
+
         <SidebarGroup>
-          <SidebarGroupLabel className="px-4 text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
-            Basic Transformations
+          <SidebarGroupLabel className="px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 py-4">
+            Transformations
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {transformations.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton 
-                    tooltip={item.title}
                     onClick={() => setActiveModule(item.id)}
                     isActive={activeModule === item.id}
-                    className="px-4 py-5"
+                    className={`
+                      px-4 py-6 rounded-lg transition-all duration-200
+                      ${activeModule === item.id 
+                        ? "bg-white/[0.05] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" 
+                        : "text-muted-foreground hover:bg-white/[0.02] hover:text-white"
+                      }
+                    `}
                   >
-                    <item.icon className="size-4" />
-                    <span className="font-medium">{item.title}</span>
-                    <ChevronRight className="ml-auto size-3 opacity-50" />
+                    <item.icon className={`size-4 ${activeModule === item.id ? "text-emerald-400" : "opacity-70"}`} />
+                    <span className="font-medium text-sm">{item.title}</span>
+                    <span className="ml-auto text-[10px] font-mono opacity-30">{item.shortcut}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

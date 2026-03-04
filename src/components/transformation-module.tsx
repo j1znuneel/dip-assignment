@@ -1,12 +1,23 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Code2, Play, RefreshCw, Download, Image as ImageIcon, BookOpen, Info } from 'lucide-react'
+import { 
+  Code2, Play, RefreshCw, Download, 
+  Image as ImageIcon, BookOpen, Info, 
+  Share2, MoreHorizontal, Copy, Check, Terminal 
+} from 'lucide-react'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { motion, AnimatePresence } from "framer-motion"
 import { TransformationGraph } from "./transformation-graph"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 
 interface ModuleProps {
   id: string
@@ -24,13 +35,21 @@ export function TransformationModule({ id, title, description, theory, formula, 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [processing, setProcessing] = useState(false)
   const [gamma, setGamma] = useState(1.0)
+  const [threshold, setThreshold] = useState(127)
+  const [copied, setCopied] = useState(false)
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(pythonCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const processImage = () => {
     if (!image || !canvasRef.current) return
     setProcessing(true)
 
     const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) return
 
     const img = new Image()
@@ -44,6 +63,16 @@ export function TransformationModule({ id, title, description, theory, formula, 
       
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const data = imageData.data
+
+      // For Contrast Stretch, we need min/max first
+      let min = 255, max = 0
+      if (id === 'contrast') {
+        for (let i = 0; i < data.length; i += 4) {
+          const avg = (data[i] + data[i+1] + data[i+2]) / 3
+          if (avg < min) min = avg
+          if (avg > max) max = avg
+        }
+      }
 
       for (let i = 0; i < data.length; i += 4) {
         if (id === 'negative') {
@@ -60,6 +89,28 @@ export function TransformationModule({ id, title, description, theory, formula, 
           data[i] = scale * Math.pow(data[i], gamma)
           data[i + 1] = scale * Math.pow(data[i + 1], gamma)
           data[i + 2] = scale * Math.pow(data[i + 2], gamma)
+        } else if (id === 'threshold') {
+          const avg = (data[i] + data[i+1] + data[i+2]) / 3
+          const val = avg > threshold ? 255 : 0
+          data[i] = val
+          data[i+1] = val
+          data[i+2] = val
+        } else if (id === 'contrast') {
+          const range = max - min || 1
+          data[i] = (data[i] - min) * (255 / range)
+          data[i+1] = (data[i+1] - min) * (255 / range)
+          data[i+2] = (data[i+2] - min) * (255 / range)
+        } else if (id === 'piecewise') {
+          // Hardcoded (r1, s1) = (70, 20), (r2, s2) = (180, 230) for demo
+          const r1 = 70, s1 = 20, r2 = 180, s2 = 230
+          const map = (v: number) => {
+            if (v <= r1) return (s1/r1) * v
+            if (v <= r2) return ((s2-s1)/(r2-r1)) * (v-r1) + s1
+            return ((255-s2)/(255-r2)) * (v-r2) + s2
+          }
+          data[i] = map(data[i])
+          data[i+1] = map(data[i+1])
+          data[i+2] = map(data[i+2])
         }
       }
       
@@ -70,32 +121,93 @@ export function TransformationModule({ id, title, description, theory, formula, 
 
   useEffect(() => {
     if (image) processImage()
-  }, [id, image, gamma])
+  }, [id, image, gamma, threshold])
 
   return (
     <motion.div 
       key={id}
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.3 }}
-      className="flex flex-col gap-6"
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="flex flex-col gap-8 max-w-6xl mx-auto"
     >
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent">
-            {title}
-          </h2>
-          <p className="text-muted-foreground text-sm max-w-2xl">{description}</p>
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-white/[0.05] pb-8">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="h-5 w-[2px] bg-emerald-500 rounded-full" />
+            <h2 className="text-3xl font-bold tracking-tight text-white/90">
+              {title}
+            </h2>
+          </div>
+          <p className="text-muted-foreground text-base max-w-2xl font-medium leading-relaxed">
+            {description}
+          </p>
         </div>
         
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <div className="flex p-1 bg-muted/40 rounded-lg border border-border/50">
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowCode(true)}
+            className="gap-2 border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] text-xs font-medium h-9 px-4 transition-all duration-300 shadow-sm"
+          >
+            <Code2 className="size-3.5" />
+            Show Code
+          </Button>
+          <Button variant="outline" size="icon" className="size-9 border-white/[0.08] bg-white/[0.02] text-muted-foreground hover:text-white transition-colors">
+            <Share2 className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={showCode} onOpenChange={setShowCode}>
+        <DialogContent className="max-w-2xl bg-[#08090a] border-white/[0.1] shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b border-white/[0.05] bg-white/[0.02]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="size-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                  <Terminal className="size-4 text-emerald-500" />
+                </div>
+                <div>
+                  <DialogTitle className="text-sm font-bold tracking-tight text-white/90">Implementation Script</DialogTitle>
+                  <DialogDescription className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Python Open-CV</DialogDescription>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={copyToClipboard}
+                className="h-8 gap-2 border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] transition-all"
+              >
+                {copied ? (
+                  <><Check className="size-3 text-emerald-500" /> Copied</>
+                ) : (
+                  <><Copy className="size-3" /> Copy Code</>
+                )}
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="relative group">
+             <ScrollArea className="h-[400px] w-full bg-[#050505]">
+                <pre className="p-8 text-[13px] font-mono text-emerald-400/80 leading-relaxed selection:bg-emerald-500/20">
+                  <code>{pythonCode}</code>
+                </pre>
+              </ScrollArea>
+              <div className="absolute top-4 right-4 text-[10px] font-mono text-muted-foreground/20 pointer-events-none group-hover:text-muted-foreground/40 transition-colors">
+                UTF-8 // transform.py
+              </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="grid gap-8 lg:grid-cols-12">
+        <div className="lg:col-span-8 space-y-8">
+          <div className="flex p-1 bg-white/[0.03] rounded-lg border border-white/[0.05] w-fit shadow-inner">
             <Button 
               variant={activeTab === 'preview' ? 'secondary' : 'ghost'} 
               size="sm" 
               onClick={() => setActiveTab('preview')}
-              className="px-3"
+              className={`px-6 h-8 text-xs font-semibold rounded-md transition-all duration-300 ${activeTab === 'preview' ? "bg-white/[0.08] text-white shadow-sm" : "text-muted-foreground hover:text-white"}`}
             >
               Workspace
             </Button>
@@ -103,173 +215,154 @@ export function TransformationModule({ id, title, description, theory, formula, 
               variant={activeTab === 'theory' ? 'secondary' : 'ghost'} 
               size="sm" 
               onClick={() => setActiveTab('theory')}
-              className="px-3"
+              className={`px-6 h-8 text-xs font-semibold rounded-md transition-all duration-300 ${activeTab === 'theory' ? "bg-white/[0.08] text-white shadow-sm" : "text-muted-foreground hover:text-white"}`}
             >
-              Theory
+              Theorems
             </Button>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowCode(!showCode)}
-            className="gap-2 border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500"
-          >
-            <Code2 className="size-4" />
-            {showCode ? "Hide Code" : "Show Code"}
-          </Button>
-        </div>
-      </div>
 
-      <AnimatePresence mode="wait">
-        {showCode && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <Card className="border-border/50 bg-black/60 backdrop-blur-xl">
-              <CardHeader className="py-2 px-4 border-b border-border/50 bg-muted/30 flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-1.5">
-                  <div className="size-2.5 rounded-full bg-rose-500/80" />
-                  <div className="size-2.5 rounded-full bg-amber-500/80" />
-                  <div className="size-2.5 rounded-full bg-emerald-500/80" />
-                  <span className="ml-2 text-xs font-mono text-muted-foreground">transform.py</span>
-                </div>
-                <Button variant="ghost" size="icon" className="size-6 text-muted-foreground">
-                  <Download className="size-3" />
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[250px] w-full">
-                  <pre className="p-6 text-xs font-mono text-emerald-400/90 leading-relaxed selection:bg-emerald-500/30">
-                    <code>{pythonCode}</code>
-                  </pre>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="grid gap-6 md:grid-cols-12">
-        <div className="md:col-span-8 flex flex-col gap-6">
-          <AnimatePresence mode="wait">
-            {activeTab === 'preview' ? (
+          <div className="relative">
+            {/* WORKSPACE - Always mounted, visibility toggled to persist canvas */}
+            <div className={activeTab === 'preview' ? 'block' : 'hidden'}>
               <motion.div 
-                key="workspace"
-                initial={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="grid gap-6 md:grid-cols-2"
+                className="grid gap-8 md:grid-cols-2"
               >
-                <Card className="border-border/50 bg-card/20 overflow-hidden backdrop-blur-sm group">
-                  <CardHeader className="py-3 px-4 border-b border-border/20 bg-muted/10">
-                    <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <ImageIcon className="size-3" />
-                      Original
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 flex items-center justify-center bg-black/40 aspect-square md:aspect-auto md:h-[400px]">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 ml-1">Input Stream</label>
+                  <div className="aspect-square rounded-2xl border border-white/[0.05] bg-[#0a0a0a] overflow-hidden group shadow-2xl relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
                     {image ? (
-                      <img src={image} alt="Original" className="max-h-full max-w-full object-contain p-4 group-hover:scale-[1.02] transition-transform duration-500" />
+                      <img src={image} alt="Original" className="h-full w-full object-contain p-8 group-hover:scale-[1.03] transition-transform duration-700 ease-out" />
                     ) : (
-                      <div className="text-muted-foreground/30 italic text-sm">No input</div>
+                      <div className="h-full w-full flex items-center justify-center">
+                         <ImageIcon className="size-8 text-white/[0.03]" />
+                      </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                <Card className="border-border/50 bg-card/20 overflow-hidden backdrop-blur-sm relative group">
-                  <CardHeader className="py-3 px-4 border-b border-border/20 bg-muted/10 flex flex-row items-center justify-between space-y-0">
-                    <CardTitle className="text-xs font-medium uppercase tracking-wider text-emerald-500/70 flex items-center gap-2">
-                      <Play className="size-3" />
-                      Result
-                    </CardTitle>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-500/60">Output Stream</label>
                     {image && (
-                      <Button variant="ghost" size="icon" className="size-6" onClick={processImage}>
+                      <button onClick={processImage} className="text-muted-foreground hover:text-emerald-400 transition-colors p-1">
                         <RefreshCw className={`size-3 ${processing ? 'animate-spin' : ''}`} />
-                      </Button>
+                      </button>
                     )}
-                  </CardHeader>
-                  <CardContent className="p-0 flex items-center justify-center bg-black/40 aspect-square md:aspect-auto md:h-[400px]">
+                  </div>
+                  <div className="aspect-square rounded-2xl border border-emerald-500/[0.05] bg-[#0a0a0a] overflow-hidden group shadow-[0_20px_50px_-20px_rgba(0,0,0,0.5)] relative">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/[0.01] to-transparent pointer-events-none" />
                     <canvas 
                       ref={canvasRef} 
-                      className={`max-h-full max-w-full object-contain p-4 group-hover:scale-[1.02] transition-transform duration-500 ${!image ? 'hidden' : ''}`} 
+                      className={`h-full w-full object-contain p-8 group-hover:scale-[1.03] transition-transform duration-700 ease-out ${!image ? 'hidden' : ''}`} 
                     />
                     {!image && (
-                      <div className="text-muted-foreground/30 italic text-sm">Waiting for input</div>
+                      <div className="h-full w-full flex items-center justify-center">
+                         <Play className="size-8 text-white/[0.03]" />
+                      </div>
                     )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="theory"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-              >
-                <Card className="border-border/50 bg-card/10 backdrop-blur-sm">
-                  <CardContent className="p-8 space-y-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-emerald-400">
-                        <BookOpen className="size-5" />
-                        <h3 className="font-semibold text-lg">Theoretical Concept</h3>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed italic">"{theory}"</p>
-                    </div>
-                    
-                    <div className="p-6 rounded-xl bg-muted/20 border border-border/50 space-y-3">
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Transformation Formula</h4>
-                      <div className="text-2xl font-mono text-center py-4 bg-black/20 rounded-lg border border-border/20">
-                        {formula}
-                      </div>
-                      <p className="text-xs text-center text-muted-foreground/60 italic">Where r = input intensity, s = output intensity</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        <div className="md:col-span-4 flex flex-col gap-6">
-          <Card className="border-border/50 bg-card/20 backdrop-blur-sm h-fit">
-            <CardHeader className="py-4 px-5 border-b border-border/20">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Info className="size-4 text-emerald-500" />
-                Control & Logic
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-5 space-y-6">
-              <div className="space-y-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Mapping Function</span>
-                <TransformationGraph id={id} gamma={gamma} />
-              </div>
-
-              {id === 'power' && image && (
-                <div className="space-y-4 pt-4 border-t border-border/20">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gamma Correction (γ)</span>
-                    <span className="text-xs font-mono bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">{gamma.toFixed(2)}</span>
-                  </div>
-                  <input 
-                    type="range" 
-                    min="0.1" 
-                    max="5" 
-                    step="0.1" 
-                    value={gamma}
-                    onChange={(e) => setGamma(parseFloat(e.target.value))}
-                    className="w-full accent-emerald-500 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>Darken (γ &gt; 1)</span>
-                    <span>Lighten (γ &lt; 1)</span>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </motion.div>
+            </div>
+
+            {/* THEORY - Always mounted, visibility toggled */}
+            <div className={activeTab === 'theory' ? 'block' : 'hidden'}>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Card className="border-white/[0.05] bg-white/[0.02] backdrop-blur-sm overflow-hidden rounded-2xl shadow-2xl">
+                  <CardContent className="p-10 space-y-10">
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3 text-white/90">
+                        <BookOpen className="size-4 text-emerald-500" />
+                        <h3 className="font-bold text-lg tracking-tight">Mathematical Foundation</h3>
+                      </div>
+                      <p className="text-muted-foreground text-lg leading-relaxed font-medium italic">
+                        "{theory}"
+                      </p>
+                    </div>
+                    
+                    <div className="p-10 rounded-2xl bg-black border border-white/[0.05] relative group transition-all duration-500 hover:border-emerald-500/20 shadow-inner">
+                      <div className="absolute top-4 left-5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 group-hover:text-emerald-500/40 transition-colors">Base Formula</div>
+                      <div className="text-4xl font-mono text-center py-6 text-white tracking-tighter">
+                        {formula}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-4 flex flex-col gap-8">
+          <div className="space-y-4">
+             <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 ml-1">Visualization</label>
+             <Card className="border-white/[0.05] bg-white/[0.01] backdrop-blur-md rounded-2xl shadow-xl">
+              <CardContent className="p-6 space-y-8">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white/80 uppercase tracking-wider">Transfer Function</span>
+                    <Info className="size-3.5 text-muted-foreground/50" />
+                  </div>
+                  <TransformationGraph id={id} gamma={gamma} threshold={threshold} />
+                </div>
+
+                {image && (activeTab === 'preview') && (
+                  <div className="space-y-6 pt-8 border-t border-white/[0.05]">
+                    {id === 'power' && (
+                      <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Gamma (γ)</span>
+                          <span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md shadow-sm">{gamma.toFixed(2)}</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="0.1" 
+                          max="5" 
+                          step="0.1" 
+                          value={gamma}
+                          onChange={(e) => setGamma(parseFloat(e.target.value))}
+                          className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer hover:bg-white/[0.1] transition-all"
+                        />
+                      </div>
+                    )}
+                    {id === 'threshold' && (
+                      <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Cutoff (T)</span>
+                          <span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md shadow-sm">{threshold}</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="255" 
+                          step="1" 
+                          value={threshold}
+                          onChange={(e) => setThreshold(parseInt(e.target.value))}
+                          className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer hover:bg-white/[0.1] transition-all"
+                        />
+                      </div>
+                    )}
+                    {id === 'contrast' && (
+                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[11px] text-emerald-400/80 font-medium leading-relaxed italic">
+                        Auto-detecting input range [min, max] and mapping to [0, 255] for optimal dynamic stretch.
+                      </div>
+                    )}
+                    {id === 'piecewise' && (
+                      <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] text-[11px] text-muted-foreground font-medium leading-relaxed">
+                        Currently mapping (70, 20) to (180, 230) for localized contrast enhancement.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </motion.div>
