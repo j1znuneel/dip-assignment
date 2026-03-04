@@ -81,9 +81,9 @@ export function TransformationModule({ id, title, description, theory, formula, 
       
       if (['median', 'max', 'min'].includes(id)) {
         for (let i = 0; i < data.length; i += 4) {
-          const rand = Math.random()
-          if (rand < noiseLevel / 2) data[i] = data[i+1] = data[i+2] = 0
-          else if (rand < noiseLevel) data[i] = data[i+1] = data[i+2] = 255
+          const r = Math.random()
+          if (r < noiseLevel / 2) data[i] = data[i+1] = data[i+2] = 0
+          else if (r < noiseLevel) data[i] = data[i+1] = data[i+2] = 255
         }
       }
 
@@ -235,86 +235,137 @@ export function TransformationModule({ id, title, description, theory, formula, 
   useEffect(() => { if (image) processImage() }, [id, image, gamma, threshold, cutoff, order, ksize, noiseLevel])
 
   return (
-    <motion.div key={id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="flex flex-col gap-8 max-w-6xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-white/[0.05] pb-8">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3"><div className="h-5 w-[2px] bg-emerald-500 rounded-full" /><h2 className="text-3xl font-bold tracking-tight text-white/90">{title}</h2></div>
-          <p className="text-muted-foreground text-base max-w-2xl font-medium leading-relaxed">{description}</p>
+    <motion.div key={id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="flex flex-col gap-6 lg:gap-8 max-w-6xl mx-auto pb-20 lg:pb-0 px-4 lg:px-0">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 lg:gap-6 border-b border-white/[0.05] pb-6 lg:pb-8">
+        <div className="space-y-2 lg:space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="h-5 w-[2px] bg-emerald-500 rounded-full" />
+            <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-white/90">{title}</h2>
+          </div>
+          <p className="text-muted-foreground text-sm lg:text-base max-w-2xl font-medium leading-relaxed">{description}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setShowCode(true)} className="gap-2 border-white/[0.08] bg-white/[0.02] text-xs h-9 px-4 transition-all duration-300 shadow-sm"><Code2 className="size-3.5" />Show Code</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowCode(true)} className="gap-2 border-white/[0.08] bg-white/[0.02] text-[10px] lg:text-xs h-8 lg:h-9 px-3 lg:px-4 transition-all duration-300 shadow-sm"><Code2 className="size-3.5" />Show Code</Button>
+        </div>
       </div>
 
       <Dialog open={showCode} onOpenChange={setShowCode}>
-        <DialogContent className="max-w-2xl bg-[#08090a] border-white/[0.1] p-0 overflow-hidden shadow-2xl">
-          <DialogHeader className="px-6 py-4 border-b border-white/[0.05] bg-white/[0.02] flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2.5"><Terminal className="size-4 text-emerald-500" /><div><DialogTitle className="text-sm font-bold text-white/90">Implementation</DialogTitle></div></div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-8 gap-2 border-white/[0.08] bg-white/[0.03] text-xs transition-all">
+        <DialogContent className="max-w-3xl w-[95vw] bg-[#08090a] border-white/[0.1] p-0 overflow-hidden shadow-2xl rounded-xl">
+          <DialogHeader className="px-4 lg:px-6 py-3 lg:py-4 border-b border-white/[0.05] bg-white/[0.02] flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Terminal className="size-4 text-emerald-500" />
+              <div className="text-sm font-bold text-white/90">Python Engine</div>
+            </div>
+            <div className="flex items-center gap-3 mr-6">
+              <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-7 lg:h-8 gap-2 border-white/[0.08] bg-white/[0.03] text-[10px] lg:text-xs transition-all">
                 {copied ? <><Check className="size-3 text-emerald-500" /> Copied</> : <><Copy className="size-3" /> Copy Code</>}
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => setShowCode(false)} className="size-8 text-muted-foreground hover:text-white"><X className="size-4" /></Button>
             </div>
           </DialogHeader>
-          <ScrollArea className="h-[400px] w-full bg-[#050505]"><pre className="p-8 text-[13px] font-mono text-emerald-400/80 leading-relaxed selection:bg-emerald-500/20"><code>{pythonCode}</code></pre></ScrollArea>
+          <ScrollArea className="h-[60vh] lg:h-[500px] w-full bg-[#050505]">
+            <pre className="p-4 lg:p-8 text-[11px] lg:text-[13px] font-mono text-emerald-400/80 leading-relaxed selection:bg-emerald-500/20 overflow-x-auto">
+              <code>{pythonCode}</code>
+            </pre>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-8 lg:grid-cols-12">
-        <div className="lg:col-span-8 space-y-8">
-          <div className="flex p-1 bg-white/[0.03] rounded-lg border border-white/[0.05] w-fit shadow-inner">
-            <Button variant={activeTab === 'preview' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveTab('preview')} className={`px-6 h-8 text-xs font-semibold rounded-md transition-all duration-300 ${activeTab === 'preview' ? "bg-white/[0.08] text-white shadow-sm" : "text-muted-foreground hover:text-white"}`}>Workspace</Button>
-            <Button variant={activeTab === 'theory' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveTab('theory')} className={`px-6 h-8 text-xs font-semibold rounded-md transition-all duration-300 ${activeTab === 'theory' ? "bg-white/[0.08] text-white shadow-sm" : "text-muted-foreground hover:text-white"}`}>Theorems</Button>
+      <div className="grid gap-6 lg:gap-8 lg:grid-cols-12">
+        <div className="lg:col-span-8 space-y-6 lg:space-y-8">
+          <div className="flex p-1 bg-white/[0.03] rounded-lg border border-white/[0.05] w-fit shadow-inner overflow-x-auto max-w-full">
+            <Button variant={activeTab === 'preview' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveTab('preview')} className={`px-4 lg:px-6 h-7 lg:h-8 text-[10px] lg:text-xs font-semibold rounded-md transition-all duration-300 ${activeTab === 'preview' ? "bg-white/[0.08] text-white shadow-sm" : "text-muted-foreground hover:text-white"}`}>Workspace</Button>
+            <Button variant={activeTab === 'theory' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveTab('theory')} className={`px-4 lg:px-6 h-7 lg:h-8 text-[10px] lg:text-xs font-semibold rounded-md transition-all duration-300 ${activeTab === 'theory' ? "bg-white/[0.08] text-white shadow-sm" : "text-muted-foreground hover:text-white"}`}>Theorems</Button>
           </div>
 
-          <div className={activeTab === 'preview' ? 'block' : 'hidden'}>
-            <div className="grid gap-8 md:grid-cols-2">
-              <div className="space-y-3"><label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">Source</label><div className="aspect-square rounded-2xl border border-white/[0.05] bg-[#0a0a0a] overflow-hidden shadow-2xl">{image && <img src={image} className="h-full w-full object-contain p-8 transition-transform duration-700 ease-out" />}</div></div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center"><label className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-500/60">Output</label><button onClick={processImage} className="text-muted-foreground hover:text-emerald-400 p-1"><RefreshCw className={`size-3 ${processing ? 'animate-spin' : ''}`} /></button></div>
-                <div className="aspect-square rounded-2xl border border-emerald-500/[0.05] bg-[#0a0a0a] overflow-hidden shadow-2xl relative"><canvas ref={canvasRef} className="h-full w-full object-contain p-8" /></div>
-              </div>
-              {id.includes('_') && (
-                <div className="md:col-span-2 space-y-3 mt-4"><label className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-500/60">FFT Spectrum Visualization</label><div className="h-48 w-full rounded-2xl border border-white/[0.05] bg-[#0a0a0a] flex items-center justify-center bg-gradient-to-br from-[#0a0a0a] to-[#050505] shadow-2xl"><canvas ref={spectrumRef} className="h-full opacity-80" /></div></div>
-              )}
+          <div className="relative">
+            <div className={activeTab === 'preview' ? 'block' : 'hidden'}>
+              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="grid gap-6 lg:gap-8 md:grid-cols-2">
+                <div className="space-y-2 lg:space-y-3">
+                  <label className="text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 ml-1">Source Stream</label>
+                  <div className="aspect-square rounded-xl lg:rounded-2xl border border-white/[0.05] bg-[#0a0a0a] overflow-hidden shadow-2xl relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+                    {image ? <img src={image} className="h-full w-full object-contain p-4 lg:p-8 transition-transform duration-700 ease-out" /> : <div className="h-full w-full flex items-center justify-center"><ImageIcon className="size-8 text-white/[0.03]" /></div>}
+                  </div>
+                </div>
+                <div className="space-y-2 lg:space-y-3">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-500/60">Output Stream</label>
+                    {image && <button onClick={processImage} className="text-muted-foreground hover:text-emerald-400 p-1"><RefreshCw className={`size-3 ${processing ? 'animate-spin' : ''}`} /></button>}
+                  </div>
+                  <div className="aspect-square rounded-xl lg:rounded-2xl border border-emerald-500/[0.05] bg-[#0a0a0a] overflow-hidden shadow-2xl relative">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/[0.01] to-transparent pointer-events-none" />
+                    <canvas ref={canvasRef} className="h-full w-full object-contain p-4 lg:p-8" />
+                  </div>
+                </div>
+                {id.includes('_') && (
+                  <div className="md:col-span-2 space-y-2 lg:space-y-3 mt-4">
+                    <label className="text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-500/60">FFT Spectrum Visualization</label>
+                    <div className="h-32 lg:h-48 w-full rounded-xl lg:rounded-2xl border border-white/[0.05] bg-[#0a0a0a] flex items-center justify-center bg-gradient-to-br from-[#0a0a0a] to-[#050505] shadow-2xl"><canvas ref={spectrumRef} className="h-full opacity-80" /></div>
+                  </div>
+                )}
+              </motion.div>
             </div>
-          </div>
 
-          <div className={activeTab === 'theory' ? 'block' : 'hidden'}>
-            <Card className="border-white/[0.05] bg-white/[0.02] backdrop-blur-sm rounded-2xl shadow-2xl"><CardContent className="p-10 space-y-10"><div className="space-y-6"><div className="flex items-center gap-3 text-white/90"><BookOpen className="size-4 text-emerald-500" /><h3 className="font-bold text-lg tracking-tight">Mathematical Foundation</h3></div><p className="text-muted-foreground text-lg italic italic">"{theory}"</p></div><div className="p-10 rounded-2xl bg-black border border-white/[0.05] relative shadow-inner"><div className="absolute top-4 left-5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30">Base Formula</div><div className="text-3xl font-mono text-center py-6 text-white tracking-tighter overflow-x-auto">{formula}</div></div></CardContent></Card>
+            <div className={activeTab === 'theory' ? 'block' : 'hidden'}>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className="border-white/[0.05] bg-white/[0.02] backdrop-blur-sm rounded-xl lg:rounded-2xl shadow-2xl">
+                  <CardContent className="p-6 lg:p-10 space-y-6 lg:space-y-10">
+                    <div className="space-y-4 lg:space-y-6">
+                      <div className="flex items-center gap-3 text-white/90"><BookOpen className="size-4 text-emerald-500" /><h3 className="font-bold lg:text-lg tracking-tight">Mathematical Foundation</h3></div>
+                      <p className="text-muted-foreground text-sm lg:text-lg leading-relaxed font-medium italic italic">"{theory}"</p>
+                    </div>
+                    <div className="p-6 lg:p-10 rounded-xl lg:rounded-2xl bg-black border border-white/[0.05] relative shadow-inner overflow-x-auto">
+                      <div className="absolute top-4 left-5 text-[8px] lg:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30">Base Formula</div>
+                      <div className="text-xl lg:text-3xl font-mono text-center py-4 lg:py-6 text-white tracking-tighter whitespace-nowrap">{formula}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
           </div>
         </div>
 
-        <div className="lg:col-span-4 flex flex-col gap-8">
-          <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 ml-1">Control Center</label>
-          <Card className="border-white/[0.05] bg-white/[0.01] backdrop-blur-md rounded-2xl shadow-xl"><CardContent className="p-6 space-y-8">
-            {image ? (
-              <div className="space-y-8">
-                {id.includes('_lpf') || id.includes('_hpf') ? (
-                  <div className="space-y-6">
-                    <div className="space-y-4"><div className="flex justify-between items-center"><span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Cutoff (D0)</span><span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{cutoff}</span></div><input type="range" min="5" max="250" step="1" value={cutoff} onChange={(e) => setCutoff(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" /></div>
-                    {id.includes('butter') && (<div className="space-y-4 pt-4 border-t border-white/[0.05]"><div className="flex justify-between items-center"><span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Order (n)</span><span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{order}</span></div><input type="range" min="1" max="10" step="1" value={order} onChange={(e) => setOrder(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" /></div>)}
-                    <TransformationGraph id={id} cutoff={cutoff} />
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {['box_blur', 'gauss_blur', 'median', 'max', 'min'].includes(id) && (
+        <div className="lg:col-span-4 flex flex-col gap-6 lg:gap-8">
+          <label className="text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 ml-1">Control Center</label>
+          <Card className="border-white/[0.05] bg-white/[0.01] backdrop-blur-md rounded-xl lg:rounded-2xl shadow-xl">
+            <CardContent className="p-4 lg:p-6 space-y-6 lg:space-y-8">
+              {image ? (
+                <div className="space-y-6 lg:space-y-8">
+                  {id.includes('_lpf') || id.includes('_hpf') ? (
+                    <div className="space-y-6">
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center"><span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Kernel Size</span><span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{ksize}x{ksize}</span></div>
-                        <input type="range" min="3" max="15" step="2" value={ksize} onChange={(e) => setKsize(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" />
+                        <div className="flex justify-between items-center"><span className="text-[10px] lg:text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Cutoff (D0)</span><span className="text-[10px] lg:text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-2 lg:px-3 py-1 lg:py-1.5 rounded-md">{cutoff}</span></div>
+                        <input type="range" min="5" max="250" step="1" value={cutoff} onChange={(e) => setCutoff(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" />
                       </div>
-                    )}
-                    {['median', 'max', 'min'].includes(id) && (
-                      <div className="space-y-4 pt-4 border-t border-white/[0.05]"><div className="flex justify-between items-center"><span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Noise Level</span><span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{(noiseLevel * 100).toFixed(0)}%</span></div><input type="range" min="0.01" max="0.5" step="0.01" value={noiseLevel} onChange={(e) => setNoiseLevel(parseFloat(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" /></div>
-                    )}
-                    {id === 'power' && (<div className="space-y-4"><div className="flex justify-between items-center"><span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Gamma (γ)</span><span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{gamma.toFixed(2)}</span></div><input type="range" min="0.1" max="5" step="0.1" value={gamma} onChange={(e) => setGamma(parseFloat(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" /></div>)}
-                    {id === 'threshold' && (<div className="space-y-4"><div className="flex justify-between items-center"><span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Cutoff (T)</span><span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{threshold}</span></div><input type="range" min="0" max="255" step="1" value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" /></div>)}
-                    {['negative', 'log', 'power', 'threshold', 'contrast', 'piecewise', 'hist_stretch'].includes(id) && (<div className="pt-4 border-t border-white/[0.05]"><TransformationGraph id={id} gamma={gamma} threshold={threshold} /></div>)}
-                  </div>
-                )}
-                <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[11px] text-emerald-400/80 italic font-medium leading-relaxed flex gap-3"><Activity className="size-4 shrink-0" /> Academic Hardware Acceleration active.</div>
-              </div>
-            ) : <div className="text-center py-10 text-muted-foreground text-xs italic">Upload stream to initialize</div>}
-          </CardContent></Card>
+                      {id.includes('butter') && (
+                        <div className="space-y-4 pt-4 border-t border-white/[0.05]">
+                          <div className="flex justify-between items-center"><span className="text-[10px] lg:text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Order (n)</span><span className="text-[10px] lg:text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-2 lg:px-3 py-1 lg:py-1.5 rounded-md">{order}</span></div>
+                          <input type="range" min="1" max="10" step="1" value={order} onChange={(e) => setOrder(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" />
+                        </div>
+                      )}
+                      <TransformationGraph id={id} cutoff={cutoff} />
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {['box_blur', 'gauss_blur', 'median', 'max', 'min'].includes(id) && (
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center"><span className="text-[10px] lg:text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Kernel Size</span><span className="text-[10px] lg:text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-2 lg:px-3 py-1 lg:py-1.5 rounded-md">{ksize}x{ksize}</span></div>
+                          <input type="range" min="3" max="15" step="2" value={ksize} onChange={(e) => setKsize(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" />
+                        </div>
+                      )}
+                      {['median', 'max', 'min'].includes(id) && (
+                        <div className="space-y-4 pt-4 border-t border-white/[0.05]"><div className="flex justify-between items-center"><span className="text-[10px] lg:text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Noise Level</span><span className="text-[10px] lg:text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-2 lg:px-3 py-1 lg:py-1.5 rounded-md">{(noiseLevel * 100).toFixed(0)}%</span></div><input type="range" min="0.01" max="0.5" step="0.01" value={noiseLevel} onChange={(e) => setNoiseLevel(parseFloat(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" /></div>
+                      )}
+                      {id === 'power' && (<div className="space-y-4"><div className="flex justify-between items-center"><span className="text-[10px] lg:text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Gamma (γ)</span><span className="text-[10px] lg:text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-2 lg:px-3 py-1 lg:py-1.5 rounded-md">{gamma.toFixed(2)}</span></div><input type="range" min="0.1" max="5" step="0.1" value={gamma} onChange={(e) => setGamma(parseFloat(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" /></div>)}
+                      {id === 'threshold' && (<div className="space-y-4"><div className="flex justify-between items-center"><span className="text-[10px] lg:text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Cutoff (T)</span><span className="text-[10px] lg:text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-2 lg:px-3 py-1 lg:py-1.5 rounded-md">{threshold}</span></div><input type="range" min="0" max="255" step="1" value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" /></div>)}
+                      {['negative', 'log', 'power', 'threshold', 'contrast', 'piecewise', 'hist_stretch'].includes(id) && (<div className="pt-4 border-t border-white/[0.05]"><TransformationGraph id={id} gamma={gamma} threshold={threshold} /></div>)}
+                    </div>
+                  )}
+                  <div className="p-3 lg:p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[10px] lg:text-[11px] text-emerald-400/80 italic font-medium leading-relaxed flex gap-3"><Activity className="size-4 shrink-0" /> Academic Engine active.</div>
+                </div>
+              ) : <div className="text-center py-10 text-muted-foreground text-[10px] lg:text-xs italic">Upload stream to initialize</div>}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </motion.div>

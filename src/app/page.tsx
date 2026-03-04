@@ -423,7 +423,12 @@ export default function DIPPage() {
           <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-white transition-colors" />
           <Separator orientation="vertical" className="mr-2 h-4 bg-white/[0.1]" />
           <div className="flex flex-1 items-center justify-between">
-            <div className="flex items-center gap-2"><span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40 text-nowrap">AetherDIP Engine</span><Separator orientation="vertical" className="h-3 mx-1 bg-white/[0.1]" /><span className="text-sm font-semibold text-white/90 truncate">{currentModule.title}</span></div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40 text-nowrap hidden lg:inline">AetherDIP Engine</span>
+              <Separator orientation="vertical" className="h-3 mx-1 bg-white/[0.1] hidden lg:block" />
+              <span className="text-sm font-semibold text-white/90 truncate max-w-[120px] lg:max-w-none">{currentModule.title}</span>
+            </div>
+
             <div className="flex items-center gap-3"><input type="file" id="image-upload" className="hidden" accept="image/*" onChange={handleImageUpload} /><Button variant="outline" size="sm" className="gap-2 border-white/[0.08] bg-white/[0.02] text-white hover:bg-white/[0.05] h-8 px-4 text-xs" asChild><label htmlFor="image-upload" className="cursor-pointer text-nowrap"><Plus className="size-3.5" /> Load Workspace</label></Button></div>
           </div>
         </header>
