@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { 
   Code2, Play, RefreshCw, Download, 
   Image as ImageIcon, BookOpen, Info, 
-  Share2, MoreHorizontal, Copy, Check, Terminal 
+  Share2, MoreHorizontal, Copy, Check, Terminal,
+  Sliders
 } from 'lucide-react'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { motion, AnimatePresence } from "framer-motion"
@@ -36,6 +37,8 @@ export function TransformationModule({ id, title, description, theory, formula, 
   const [processing, setProcessing] = useState(false)
   const [gamma, setGamma] = useState(1.0)
   const [threshold, setThreshold] = useState(127)
+  const [ksize, setKsize] = useState(3)
+  const [noiseLevel, setNoiseLevel] = useState(0.05)
   const [copied, setCopied] = useState(false)
 
   const copyToClipboard = () => {
@@ -62,66 +65,150 @@ export function TransformationModule({ id, title, description, theory, formula, 
       ctx.drawImage(img, 0, 0)
       
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const data = imageData.data
+      const data = new Uint8ClampedArray(imageData.data)
+      const width = canvas.width
+      const height = canvas.height
+      const outputData = ctx.createImageData(width, height)
+      const output = outputData.data
 
-      // For Contrast Stretch, we need min/max first
-      let min = 255, max = 0
-      if (id === 'contrast') {
+      // Helper to get pixel
+      const getPixel = (x: number, y: number) => {
+        x = Math.max(0, Math.min(width - 1, x))
+        y = Math.max(0, Math.min(height - 1, y))
+        const idx = (y * width + x) * 4
+        return [data[idx], data[idx+1], data[idx+2]]
+      }
+
+      // NOISE ADDITION STEP (For Median, Max, Min)
+      if (['median', 'max', 'min'].includes(id)) {
         for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i+1] + data[i+2]) / 3
-          if (avg < min) min = avg
-          if (avg > max) max = avg
+          const rand = Math.random()
+          if (rand < noiseLevel / 2) { // Pepper
+            data[i] = data[i+1] = data[i+2] = 0
+          } else if (rand < noiseLevel) { // Salt
+            data[i] = data[i+1] = data[i+2] = 255
+          }
         }
       }
 
-      for (let i = 0; i < data.length; i += 4) {
-        if (id === 'negative') {
-          data[i] = 255 - data[i]
-          data[i + 1] = 255 - data[i + 1]
-          data[i + 2] = 255 - data[i + 2]
-        } else if (id === 'log') {
+      // ALGORITHMS
+      if (['negative', 'log', 'power', 'threshold', 'contrast', 'hist_stretch', 'hist_eq', 'piecewise'].includes(id)) {
+        // LUT based point processing
+        const lut = new Uint8Array(256)
+        if (id === 'negative') for (let i = 0; i < 256; i++) lut[i] = 255 - i
+        else if (id === 'log') {
           const scale = 255 / Math.log(256)
-          data[i] = scale * Math.log(1 + data[i])
-          data[i + 1] = scale * Math.log(1 + data[i + 1])
-          data[i + 2] = scale * Math.log(1 + data[i + 2])
-        } else if (id === 'power') {
+          for (let i = 0; i < 256; i++) lut[i] = scale * Math.log(1 + i)
+        }
+        else if (id === 'power') {
           const scale = 255 / Math.pow(255, gamma)
-          data[i] = scale * Math.pow(data[i], gamma)
-          data[i + 1] = scale * Math.pow(data[i + 1], gamma)
-          data[i + 2] = scale * Math.pow(data[i + 2], gamma)
-        } else if (id === 'threshold') {
-          const avg = (data[i] + data[i+1] + data[i+2]) / 3
-          const val = avg > threshold ? 255 : 0
-          data[i] = val
-          data[i+1] = val
-          data[i+2] = val
-        } else if (id === 'contrast') {
-          const range = max - min || 1
-          data[i] = (data[i] - min) * (255 / range)
-          data[i+1] = (data[i+1] - min) * (255 / range)
-          data[i+2] = (data[i+2] - min) * (255 / range)
-        } else if (id === 'piecewise') {
-          // Hardcoded (r1, s1) = (70, 20), (r2, s2) = (180, 230) for demo
-          const r1 = 70, s1 = 20, r2 = 180, s2 = 230
-          const map = (v: number) => {
-            if (v <= r1) return (s1/r1) * v
-            if (v <= r2) return ((s2-s1)/(r2-r1)) * (v-r1) + s1
-            return ((255-s2)/(255-r2)) * (v-r2) + s2
+          for (let i = 0; i < 256; i++) lut[i] = scale * Math.pow(i, gamma)
+        }
+        else if (id === 'threshold') for (let i = 0; i < 256; i++) lut[i] = i > threshold ? 255 : 0
+        else if (id === 'contrast' || id === 'hist_stretch') {
+          let min = 255, max = 0
+          for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i+1] + data[i+2]) / 3
+            if (avg < min) min = avg
+            if (avg > max) max = avg
           }
-          data[i] = map(data[i])
-          data[i+1] = map(data[i+1])
-          data[i+2] = map(data[i+2])
+          const range = max - min || 1
+          for (let i = 0; i < 256; i++) lut[i] = Math.max(0, Math.min(255, (i - min) * (255 / range)))
+        }
+        else if (id === 'hist_eq') {
+          const hist = new Uint32Array(256)
+          for (let i = 0; i < data.length; i += 4) {
+            const avg = ((data[i] + data[i+1] + data[i+2]) / 3) | 0
+            hist[avg]++
+          }
+          const cdf = new Uint32Array(256)
+          cdf[0] = hist[0]
+          for (let i = 1; i < 256; i++) cdf[i] = cdf[i-1] + hist[i]
+          const minCDF = cdf.find(v => v > 0) || 0
+          const den = (width * height) - minCDF || 1
+          for (let i = 0; i < 256; i++) lut[i] = Math.max(0, Math.min(255, Math.round(((cdf[i] - minCDF) / den) * 255)))
+        }
+        else if (id === 'piecewise') {
+          const r1 = 70, s1 = 20, r2 = 180, s2 = 230
+          for (let i = 0; i < 256; i++) {
+            if (i <= r1) lut[i] = (s1/r1) * i
+            else if (i <= r2) lut[i] = ((s2-s1)/(r2-r1)) * (i-r1) + s1
+            else lut[i] = ((255-s2)/(255-r2)) * (i-r2) + s2
+          }
+        }
+
+        for (let i = 0; i < data.length; i += 4) {
+          output[i] = lut[data[i]]
+          output[i+1] = lut[data[i+1]]
+          output[i+2] = lut[data[i+2]]
+          output[i+3] = 255
+        }
+      } else {
+        // SPATIAL FILTERING
+        const offset = Math.floor(ksize / 2)
+        
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4
+            const neighborhoodR = []
+            const neighborhoodG = []
+            const neighborhoodB = []
+            
+            let resR = 0, resG = 0, resB = 0
+            
+            // Collect neighborhood
+            for (let i = -offset; i <= offset; i++) {
+              for (let j = -offset; j <= offset; j++) {
+                const [r, g, b] = getPixel(x + j, y + i)
+                
+                if (['median', 'max', 'min'].includes(id)) {
+                  neighborhoodR.push(r); neighborhoodG.push(g); neighborhoodB.push(b);
+                } else if (id === 'box_blur') {
+                  const weight = 1 / (ksize * ksize)
+                  resR += r * weight; resG += g * weight; resB += b * weight;
+                } else if (id === 'laplacian') {
+                  const kernel = [[0, -1, 0], [-1, 4, -1], [0, -1, 0]]
+                  const weight = kernel[i+offset][j+offset]
+                  resR += r * weight; resG += g * weight; resB += b * weight;
+                } else if (id === 'gaussian') {
+                  const sigma = 1.0
+                  const weight = (1 / (2 * Math.PI * sigma * sigma)) * Math.exp(-(j*j + i*i) / (2 * sigma * sigma))
+                  // Note: Gaussian needs normalization but we'll approximate for speed
+                  resR += r * weight; resG += g * weight; resB += b * weight;
+                } else if (id === 'convolution') {
+                  const kernel = [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]]
+                  const weight = kernel[i+offset][j+offset]
+                  resR += r * weight; resG += g * weight; resB += b * weight;
+                }
+              }
+            }
+
+            if (id === 'median') {
+              neighborhoodR.sort((a, b) => a - b); neighborhoodG.sort((a, b) => a - b); neighborhoodB.sort((a, b) => a - b);
+              const mid = Math.floor(neighborhoodR.length / 2)
+              output[idx] = neighborhoodR[mid]; output[idx+1] = neighborhoodG[mid]; output[idx+2] = neighborhoodB[mid];
+            } else if (id === 'max') {
+              output[idx] = Math.max(...neighborhoodR); output[idx+1] = Math.max(...neighborhoodG); output[idx+2] = Math.max(...neighborhoodB);
+            } else if (id === 'min') {
+              output[idx] = Math.min(...neighborhoodR); output[idx+1] = Math.min(...neighborhoodG); output[idx+2] = Math.min(...neighborhoodB);
+            } else {
+              output[idx] = Math.max(0, Math.min(255, resR))
+              output[idx+1] = Math.max(0, Math.min(255, resG))
+              output[idx+2] = Math.max(0, Math.min(255, resB))
+            }
+            output[idx+3] = 255
+          }
         }
       }
       
-      ctx.putImageData(imageData, 0, 0)
+      ctx.putImageData(outputData, 0, 0)
       setProcessing(false)
     }
   }
 
   useEffect(() => {
     if (image) processImage()
-  }, [id, image, gamma, threshold])
+  }, [id, image, gamma, threshold, ksize, noiseLevel])
 
   return (
     <motion.div 
@@ -193,9 +280,6 @@ export function TransformationModule({ id, title, description, theory, formula, 
                   <code>{pythonCode}</code>
                 </pre>
               </ScrollArea>
-              <div className="absolute top-4 right-4 text-[10px] font-mono text-muted-foreground/20 pointer-events-none group-hover:text-muted-foreground/40 transition-colors">
-                UTF-8 // transform.py
-              </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -222,7 +306,6 @@ export function TransformationModule({ id, title, description, theory, formula, 
           </div>
 
           <div className="relative">
-            {/* WORKSPACE - Always mounted, visibility toggled to persist canvas */}
             <div className={activeTab === 'preview' ? 'block' : 'hidden'}>
               <motion.div 
                 initial={{ opacity: 0, x: -10 }}
@@ -232,9 +315,8 @@ export function TransformationModule({ id, title, description, theory, formula, 
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 ml-1">Input Stream</label>
                   <div className="aspect-square rounded-2xl border border-white/[0.05] bg-[#0a0a0a] overflow-hidden group shadow-2xl relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
                     {image ? (
-                      <img src={image} alt="Original" className="h-full w-full object-contain p-8 group-hover:scale-[1.03] transition-transform duration-700 ease-out" />
+                      <img src={image} alt="Original" className="h-full w-full object-contain p-8 transition-transform duration-700 ease-out" />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center">
                          <ImageIcon className="size-8 text-white/[0.03]" />
@@ -252,11 +334,10 @@ export function TransformationModule({ id, title, description, theory, formula, 
                       </button>
                     )}
                   </div>
-                  <div className="aspect-square rounded-2xl border border-emerald-500/[0.05] bg-[#0a0a0a] overflow-hidden group shadow-[0_20px_50px_-20px_rgba(0,0,0,0.5)] relative">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/[0.01] to-transparent pointer-events-none" />
+                  <div className="aspect-square rounded-2xl border border-emerald-500/[0.05] bg-[#0a0a0a] overflow-hidden group shadow-2xl relative">
                     <canvas 
                       ref={canvasRef} 
-                      className={`h-full w-full object-contain p-8 group-hover:scale-[1.03] transition-transform duration-700 ease-out ${!image ? 'hidden' : ''}`} 
+                      className={`h-full w-full object-contain p-8 ${!image ? 'hidden' : ''}`} 
                     />
                     {!image && (
                       <div className="h-full w-full flex items-center justify-center">
@@ -268,12 +349,8 @@ export function TransformationModule({ id, title, description, theory, formula, 
               </motion.div>
             </div>
 
-            {/* THEORY - Always mounted, visibility toggled */}
             <div className={activeTab === 'theory' ? 'block' : 'hidden'}>
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                 <Card className="border-white/[0.05] bg-white/[0.02] backdrop-blur-sm overflow-hidden rounded-2xl shadow-2xl">
                   <CardContent className="p-10 space-y-10">
                     <div className="space-y-6">
@@ -281,16 +358,11 @@ export function TransformationModule({ id, title, description, theory, formula, 
                         <BookOpen className="size-4 text-emerald-500" />
                         <h3 className="font-bold text-lg tracking-tight">Mathematical Foundation</h3>
                       </div>
-                      <p className="text-muted-foreground text-lg leading-relaxed font-medium italic">
-                        "{theory}"
-                      </p>
+                      <p className="text-muted-foreground text-lg leading-relaxed font-medium italic italic">"{theory}"</p>
                     </div>
-                    
-                    <div className="p-10 rounded-2xl bg-black border border-white/[0.05] relative group transition-all duration-500 hover:border-emerald-500/20 shadow-inner">
-                      <div className="absolute top-4 left-5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 group-hover:text-emerald-500/40 transition-colors">Base Formula</div>
-                      <div className="text-4xl font-mono text-center py-6 text-white tracking-tighter">
-                        {formula}
-                      </div>
+                    <div className="p-10 rounded-2xl bg-black border border-white/[0.05] relative group shadow-inner">
+                      <div className="absolute top-4 left-5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30">Base Formula</div>
+                      <div className="text-4xl font-mono text-center py-6 text-white tracking-tighter">{formula}</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -301,65 +373,58 @@ export function TransformationModule({ id, title, description, theory, formula, 
 
         <div className="lg:col-span-4 flex flex-col gap-8">
           <div className="space-y-4">
-             <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 ml-1">Visualization</label>
+             <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 ml-1">Control Center</label>
              <Card className="border-white/[0.05] bg-white/[0.01] backdrop-blur-md rounded-2xl shadow-xl">
               <CardContent className="p-6 space-y-8">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white/80 uppercase tracking-wider">Transfer Function</span>
-                    <Info className="size-3.5 text-muted-foreground/50" />
-                  </div>
-                  <TransformationGraph id={id} gamma={gamma} threshold={threshold} />
-                </div>
-
                 {image && (activeTab === 'preview') && (
-                  <div className="space-y-6 pt-8 border-t border-white/[0.05]">
+                  <div className="space-y-8">
+                    {/* Common Controls */}
+                    {['box_blur', 'gaussian', 'median', 'max', 'min'].includes(id) && (
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Kernel Size (k)</span>
+                          <span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{ksize}x{ksize}</span>
+                        </div>
+                        <input type="range" min="3" max="15" step="2" value={ksize} onChange={(e) => setKsize(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" />
+                      </div>
+                    )}
+
+                    {['median', 'max', 'min'].includes(id) && (
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Noise Density</span>
+                          <span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{(noiseLevel * 100).toFixed(0)}%</span>
+                        </div>
+                        <input type="range" min="0.01" max="0.5" step="0.01" value={noiseLevel} onChange={(e) => setNoiseLevel(parseFloat(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" />
+                      </div>
+                    )}
+
                     {id === 'power' && (
-                      <div className="space-y-6">
+                      <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Gamma (γ)</span>
-                          <span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md shadow-sm">{gamma.toFixed(2)}</span>
+                          <span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{gamma.toFixed(2)}</span>
                         </div>
-                        <input 
-                          type="range" 
-                          min="0.1" 
-                          max="5" 
-                          step="0.1" 
-                          value={gamma}
-                          onChange={(e) => setGamma(parseFloat(e.target.value))}
-                          className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer hover:bg-white/[0.1] transition-all"
-                        />
+                        <input type="range" min="0.1" max="5" step="0.1" value={gamma} onChange={(e) => setGamma(parseFloat(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" />
                       </div>
                     )}
+
                     {id === 'threshold' && (
-                      <div className="space-y-6">
+                      <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-bold text-white/60 uppercase tracking-[0.15em]">Cutoff (T)</span>
-                          <span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md shadow-sm">{threshold}</span>
+                          <span className="text-xs font-mono bg-white/[0.05] border border-white/[0.08] text-white px-3 py-1.5 rounded-md">{threshold}</span>
                         </div>
-                        <input 
-                          type="range" 
-                          min="0" 
-                          max="255" 
-                          step="1" 
-                          value={threshold}
-                          onChange={(e) => setThreshold(parseInt(e.target.value))}
-                          className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer hover:bg-white/[0.1] transition-all"
-                        />
+                        <input type="range" min="0" max="255" step="1" value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value))} className="w-full accent-emerald-500 h-[3px] bg-white/[0.05] rounded-full appearance-none cursor-pointer" />
                       </div>
                     )}
-                    {id === 'contrast' && (
-                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[11px] text-emerald-400/80 font-medium leading-relaxed italic">
-                        Auto-detecting input range [min, max] and mapping to [0, 255] for optimal dynamic stretch.
-                      </div>
-                    )}
-                    {id === 'piecewise' && (
-                      <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] text-[11px] text-muted-foreground font-medium leading-relaxed">
-                        Currently mapping (70, 20) to (180, 230) for localized contrast enhancement.
-                      </div>
-                    )}
+
+                    <div className="pt-4 border-t border-white/[0.05]">
+                      <TransformationGraph id={id} gamma={gamma} threshold={threshold} />
+                    </div>
                   </div>
                 )}
+                {!image && <div className="text-center py-10 text-muted-foreground text-xs italic">Upload stream to unlock controls</div>}
               </CardContent>
             </Card>
           </div>

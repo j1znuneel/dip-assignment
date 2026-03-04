@@ -5,10 +5,17 @@ import {
   MinusCircle, 
   Settings2, 
   Zap, 
-  ChevronRight,
   Binary,
   Command,
-  Search
+  Search,
+  BarChart3,
+  Layers,
+  SlidersHorizontal,
+  Box,
+  Wind,
+  Focus,
+  Activity,
+  Trash2
 } from "lucide-react"
 
 import {
@@ -24,43 +31,42 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-const transformations = [
+const categories = [
   {
-    title: "Negative",
-    id: "negative",
-    icon: MinusCircle,
-    shortcut: "N",
+    label: "Point Transformations",
+    items: [
+      { title: "Negative", id: "negative", icon: MinusCircle, shortcut: "N" },
+      { title: "Log Transform", id: "log", icon: Settings2, shortcut: "L" },
+      { title: "Power Law", id: "power", icon: Zap, shortcut: "P" },
+      { title: "Thresholding", id: "threshold", icon: MinusCircle, shortcut: "T" },
+    ]
   },
   {
-    title: "Log Transform",
-    id: "log",
-    icon: Settings2,
-    shortcut: "L",
+    label: "Histogram Processing",
+    items: [
+      { title: "Hist Stretching", id: "hist_stretch", icon: BarChart3, shortcut: "H" },
+      { title: "Hist Equalization", id: "hist_eq", icon: BarChart3, shortcut: "E" },
+      { title: "Contrast Stretch", id: "contrast", icon: SlidersHorizontal, shortcut: "C" },
+      { title: "Piecewise Linear", id: "piecewise", icon: Layers, shortcut: "W" },
+    ]
   },
   {
-    title: "Power Law",
-    id: "power",
-    icon: Zap,
-    shortcut: "P",
+    label: "Spatial Filtering",
+    items: [
+      { title: "Box Blur", id: "box_blur", icon: Box, shortcut: "B" },
+      { title: "Gaussian Blur", id: "gaussian", icon: Wind, shortcut: "G" },
+      { title: "Laplacian", id: "laplacian", icon: Focus, shortcut: "A" },
+      { title: "Convolution", id: "convolution", icon: Activity, shortcut: "V" },
+    ]
   },
   {
-    title: "Contrast Stretch",
-    id: "contrast",
-    icon: Settings2,
-    shortcut: "C",
-  },
-  {
-    title: "Thresholding",
-    id: "threshold",
-    icon: MinusCircle,
-    shortcut: "T",
-  },
-  {
-    title: "Piecewise Linear",
-    id: "piecewise",
-    icon: Zap,
-    shortcut: "W",
-  },
+    label: "Noise & Restoration",
+    items: [
+      { title: "Median (S&P)", id: "median", icon: Trash2, shortcut: "M" },
+      { title: "Max Filter", id: "max", icon: Zap, shortcut: "X" },
+      { title: "Min Filter", id: "min", icon: MinusCircle, shortcut: "I" },
+    ]
+  }
 ]
 
 interface DIPSidebarProps {
@@ -94,34 +100,36 @@ export function DIPSidebar({ activeModule, setActiveModule }: DIPSidebarProps) {
           </div>
         </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 py-4">
-            Transformations
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              {transformations.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton 
-                    onClick={() => setActiveModule(item.id)}
-                    isActive={activeModule === item.id}
-                    className={`
-                      px-4 py-6 rounded-lg transition-all duration-200
-                      ${activeModule === item.id 
-                        ? "bg-white/[0.05] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" 
-                        : "text-muted-foreground hover:bg-white/[0.02] hover:text-white"
-                      }
-                    `}
-                  >
-                    <item.icon className={`size-4 ${activeModule === item.id ? "text-emerald-400" : "opacity-70"}`} />
-                    <span className="font-medium text-sm">{item.title}</span>
-                    <span className="ml-auto text-[10px] font-mono opacity-30">{item.shortcut}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {categories.map((category) => (
+          <SidebarGroup key={category.label}>
+            <SidebarGroupLabel className="px-4 text-[9px] font-black uppercase tracking-[0.25em] text-muted-foreground/30 py-4">
+              {category.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+                {category.items.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton 
+                      onClick={() => setActiveModule(item.id)}
+                      isActive={activeModule === item.id}
+                      className={`
+                        px-4 py-5 rounded-md transition-all duration-200
+                        ${activeModule === item.id 
+                          ? "bg-white/[0.06] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" 
+                          : "text-muted-foreground hover:bg-white/[0.02] hover:text-white"
+                        }
+                      `}
+                    >
+                      <item.icon className={`size-3.5 ${activeModule === item.id ? "text-emerald-400" : "opacity-40"}`} />
+                      <span className="font-medium text-[13px]">{item.title}</span>
+                      <span className="ml-auto text-[9px] font-mono opacity-20">{item.shortcut}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

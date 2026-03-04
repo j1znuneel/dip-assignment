@@ -30,10 +30,13 @@ export function TransformationGraph({ id, gamma = 1.0, threshold = 127 }: GraphP
       s = Math.pow(r, gamma)
     } else if (id === 'threshold') {
       s = (r * 255) > threshold ? 1 : 0
-    } else if (id === 'contrast') {
+    } else if (id === 'contrast' || id === 'hist_stretch') {
       // Linear stretch demo: map [0.2, 0.8] to [0, 1]
       s = (r - 0.2) / 0.6
       s = Math.max(0, Math.min(1, s))
+    } else if (id === 'hist_eq') {
+      // Show an idealized CDF (S-curve) for equalization
+      s = 1 / (1 + Math.exp(-10 * (r - 0.5)))
     } else if (id === 'piecewise') {
       // Match the processing logic: (70, 20) to (180, 230)
       const rv = r * 255
