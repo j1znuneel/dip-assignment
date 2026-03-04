@@ -15,7 +15,11 @@ import {
   Wind,
   Focus,
   Activity,
-  Trash2
+  Trash2,
+  Scissors,
+  Waves,
+  ZapOff,
+  CircleDashed
 } from "lucide-react"
 
 import {
@@ -33,38 +37,43 @@ import {
 
 const categories = [
   {
-    label: "Point Transformations",
+    label: "Intensity Transforms",
     items: [
       { title: "Negative", id: "negative", icon: MinusCircle, shortcut: "N" },
       { title: "Log Transform", id: "log", icon: Settings2, shortcut: "L" },
       { title: "Power Law", id: "power", icon: Zap, shortcut: "P" },
-      { title: "Thresholding", id: "threshold", icon: MinusCircle, shortcut: "T" },
+      { title: "Thresholding", id: "threshold", icon: CircleDashed, shortcut: "T" },
     ]
   },
   {
-    label: "Histogram Processing",
+    label: "Linear & Histogram",
     items: [
-      { title: "Hist Stretching", id: "hist_stretch", icon: BarChart3, shortcut: "H" },
-      { title: "Hist Equalization", id: "hist_eq", icon: BarChart3, shortcut: "E" },
       { title: "Contrast Stretch", id: "contrast", icon: SlidersHorizontal, shortcut: "C" },
       { title: "Piecewise Linear", id: "piecewise", icon: Layers, shortcut: "W" },
+      { title: "Hist Equalization", id: "hist_eq", icon: BarChart3, shortcut: "E" },
     ]
   },
   {
     label: "Spatial Filtering",
     items: [
       { title: "Box Blur", id: "box_blur", icon: Box, shortcut: "B" },
-      { title: "Gaussian Blur", id: "gaussian", icon: Wind, shortcut: "G" },
+      { title: "Gaussian Blur", id: "gauss_blur", icon: Wind, shortcut: "G" },
       { title: "Laplacian", id: "laplacian", icon: Focus, shortcut: "A" },
-      { title: "Convolution", id: "convolution", icon: Activity, shortcut: "V" },
+      { title: "Sobel", id: "sobel", icon: Scissors, shortcut: "D" },
     ]
   },
   {
-    label: "Noise & Restoration",
+    label: "Frequency Domain",
     items: [
-      { title: "Median (S&P)", id: "median", icon: Trash2, shortcut: "M" },
-      { title: "Max Filter", id: "max", icon: Zap, shortcut: "X" },
-      { title: "Min Filter", id: "min", icon: MinusCircle, shortcut: "I" },
+      { title: "Lowpass Filters", id: "ideal_lpf", icon: Waves, shortcut: "1" },
+      { title: "Highpass Filters", id: "ideal_hpf", icon: Zap, shortcut: "2" },
+    ]
+  },
+  {
+    label: "Restoration",
+    items: [
+      { title: "Median Filter", id: "median", icon: Trash2, shortcut: "M" },
+      { title: "Max / Min Filter", id: "max", icon: ZapOff, shortcut: "X" },
     ]
   }
 ]
@@ -111,16 +120,16 @@ export function DIPSidebar({ activeModule, setActiveModule }: DIPSidebarProps) {
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton 
                       onClick={() => setActiveModule(item.id)}
-                      isActive={activeModule === item.id}
+                      isActive={activeModule === item.id || (item.id === 'ideal_lpf' && activeModule.includes('_lpf')) || (item.id === 'ideal_hpf' && activeModule.includes('_hpf'))}
                       className={`
                         px-4 py-5 rounded-md transition-all duration-200
-                        ${activeModule === item.id 
+                        ${(activeModule === item.id || (item.id === 'ideal_lpf' && activeModule.includes('_lpf')) || (item.id === 'ideal_hpf' && activeModule.includes('_hpf')))
                           ? "bg-white/[0.06] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" 
                           : "text-muted-foreground hover:bg-white/[0.02] hover:text-white"
                         }
                       `}
                     >
-                      <item.icon className={`size-3.5 ${activeModule === item.id ? "text-emerald-400" : "opacity-40"}`} />
+                      <item.icon className={`size-3.5 ${(activeModule === item.id || (item.id === 'ideal_lpf' && activeModule.includes('_lpf')) || (item.id === 'ideal_hpf' && activeModule.includes('_hpf'))) ? "text-emerald-400" : "opacity-40"}`} />
                       <span className="font-medium text-[13px]">{item.title}</span>
                       <span className="ml-auto text-[9px] font-mono opacity-20">{item.shortcut}</span>
                     </SidebarMenuButton>
